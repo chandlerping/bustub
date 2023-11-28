@@ -15,6 +15,7 @@
 #include <list>
 #include <mutex>  // NOLINT
 #include <vector>
+#include <unordered_map>
 
 #include "buffer/replacer.h"
 #include "common/config.h"
@@ -47,6 +48,15 @@ class LRUReplacer : public Replacer {
 
  private:
   // TODO(student): implement me!
+  size_t max_num_pages_;
+
+  // std::unordered_map<frame_id_t, bool> exist_;
+
+  std::list<frame_id_t> frame_list_;
+
+  std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> frame_id2itr_;
+
+  std::recursive_mutex latch_;
 };
 
 }  // namespace bustub

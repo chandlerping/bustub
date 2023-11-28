@@ -13,13 +13,14 @@
 #include <cstdio>
 #include <thread>  // NOLINT
 #include <vector>
+#include <iostream>
 
 #include "buffer/lru_replacer.h"
 #include "gtest/gtest.h"
 
 namespace bustub {
 
-TEST(LRUReplacerTest, DISABLED_SampleTest) {
+TEST(LRUReplacerTest, SampleTest) {
   LRUReplacer lru_replacer(7);
 
   // Scenario: unpin six elements, i.e. add them to the replacer.

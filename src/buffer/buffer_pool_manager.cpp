@@ -48,6 +48,7 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   // 3.     Delete R from the page table and insert P.
   // 4.     Update P's metadata, read in the page content from disk, and then return a pointer to P.
   
+  // lock
   latch_.lock();
 
   // search if the requested page exists
@@ -78,7 +79,6 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   page_table_[page_id] = frame_id_r;
 
   // update P's metadata and read from disk
-  pages_[frame_id_r].WLatch();
   // write R to disk if dirty
   if (pages_[frame_id_r].IsDirty()) {
     disk_manager_->WritePage(page_id_r, pages_[frame_id_r].GetData());
@@ -87,18 +87,19 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   pages_[frame_id_r].is_dirty_ = false;
   pages_[frame_id_r].pin_count_++;
   disk_manager_->ReadPage(page_id, pages_[frame_id_r].GetData());
-  pages_[frame_id_r].WUnlatch();
+  // pages_[frame_id_r].WUnlatch();
 
   latch_.unlock();
   return &pages_[frame_id_r];
 }
 
 bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
+  // lock
   latch_.lock();
 
   // check if page to unpin is in buffer pool
   if (page_table_.find(page_id) == page_table_.end()) {
-    LOG_DEBUG("page to unpin not in buffer pool");
+    latch_.unlock();
     return false;
   }
 
@@ -110,14 +111,15 @@ bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
   }
 
   // unpin, add to free_list and replacer if pin_count == 0
-  pages_[frame_id].WLatch();
-  pages_[frame_id].is_dirty_ = is_dirty;
+  if (!pages_[frame_id].is_dirty_) {
+    // if this page is already dirty, we don't modify it.
+    pages_[frame_id].is_dirty_ = is_dirty;
+  }
   pages_[frame_id].pin_count_--;
   if (pages_[frame_id].pin_count_ == 0) {
     replacer_->Unpin(frame_id);
     free_list_.push_back(frame_id);
   }
-  pages_[frame_id].WUnlatch();
 
   latch_.unlock();
   return true;
@@ -126,6 +128,7 @@ bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
 bool BufferPoolManager::FlushPageImpl(page_id_t page_id) {
   // Make sure you call DiskManager::WritePage!
 
+  // lock
   latch_.lock();
 
   // return false if page not found in page table
@@ -133,7 +136,7 @@ bool BufferPoolManager::FlushPageImpl(page_id_t page_id) {
     return false;
   }
 
-  // flush the page
+  // flush the page to disk
   frame_id_t frame_id = page_table_[page_id];
   disk_manager_->WritePage(page_id, pages_[frame_id].GetData());
 
@@ -148,6 +151,7 @@ Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
   // 3.   Update P's metadata, zero out memory and add P to the page table.
   // 4.   Set the page ID output parameter. Return a pointer to P.
 
+  // lock
   latch_.lock();
 
   // return nullptr if all pages in buffer pool are pinned
@@ -182,12 +186,10 @@ Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
   *page_id = disk_manager_->AllocatePage();
 
   // update P's metadata and zero out memory
-  pages_[frame_id_p].WLatch();
   pages_[frame_id_p].page_id_ = *page_id;
   pages_[frame_id_p].pin_count_++;
   pages_[frame_id_p].is_dirty_ = false;
   pages_[frame_id_p].ResetMemory();
-  pages_[frame_id_p].WUnlatch();
 
   // update replacer and replacer
   replacer_->Pin(frame_id_p);
@@ -204,10 +206,12 @@ bool BufferPoolManager::DeletePageImpl(page_id_t page_id) {
   // 2.   If P exists, but has a non-zero pin-count, return false. Someone is using the page.
   // 3.   Otherwise, P can be deleted. Remove P from the page table, reset its metadata and return it to the free list.
   
+  // lock
   latch_.lock();
 
   // if page doesn't exist, return true
   if (page_table_.find(page_id) == page_table_.end()) {
+    latch_.unlock();
     return true;
   }
 
@@ -215,6 +219,7 @@ bool BufferPoolManager::DeletePageImpl(page_id_t page_id) {
   frame_id_t frame_id = page_table_[page_id];
   // return false if pin count > 0
   if (pages_[frame_id].GetPinCount() > 0) {
+    latch_.unlock();
     return false;
   }
 
@@ -225,11 +230,9 @@ bool BufferPoolManager::DeletePageImpl(page_id_t page_id) {
   disk_manager_->DeallocatePage(page_id);
 
   // update metadata
-  pages_[frame_id].WLatch();
   pages_[frame_id].page_id_ = INVALID_PAGE_ID;
   pages_[frame_id].pin_count_ = 0;
   pages_[frame_id].is_dirty_ = false;
-  pages_[frame_id].WUnlatch();
 
   // return to free list and unpin it
   free_list_.push_back(frame_id);

@@ -260,3 +260,8 @@ docs/dev
 
 # Vagrant
 .vagrant
+
+
+
+# cache
+*.cache*

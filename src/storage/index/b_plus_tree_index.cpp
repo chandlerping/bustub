@@ -10,6 +10,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "storage/index/b_plus_tree_index.h"
+#include "catalog/schema.h"
+#include "storage/index/index.h"
+#include "storage/table/tuple.h"
 
 namespace bustub {
 /*

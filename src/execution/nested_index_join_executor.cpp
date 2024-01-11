@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "execution/executors/nested_index_join_executor.h"
+#include "common/rid.h"
+#include "storage/table/tuple.h"
 
 namespace bustub {
 

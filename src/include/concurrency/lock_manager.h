@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/config.h"
 #include "common/rid.h"
 #include "concurrency/transaction.h"
 
@@ -131,6 +132,10 @@ class LockManager {
   /** Runs cycle detection in the background. */
   void RunCycleDetection();
 
+  txn_id_t dfs(txn_id_t t1, std::unordered_map<txn_id_t, int> &vis, std::vector<txn_id_t> &status);
+
+  // void AbortTransaction(txn_id_t txn_id);
+
  private:
   std::mutex latch_;
   std::atomic<bool> enable_cycle_detection_;
@@ -140,6 +145,8 @@ class LockManager {
   std::unordered_map<RID, LockRequestQueue> lock_table_;
   /** Waits-for graph representation. */
   std::unordered_map<txn_id_t, std::vector<txn_id_t>> waits_for_;
+
+  std::mutex queue_latch_;
 };
 
 }  // namespace bustub
